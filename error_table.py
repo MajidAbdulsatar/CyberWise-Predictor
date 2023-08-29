@@ -12,12 +12,12 @@ def calculate_errors(row):
     return row
 
 def calc_error(file_name):
-    # Read the CSV file
     df = pd.read_csv(file_name)
-
-    # Calculate both percentage errors and bias for the three score columns
+    df = df[df['has_cvss_v2']==1]
+    df['impactScore'] = df['impactScore'].astype(float)
+    df['exploitabilityScore'] = df['exploitabilityScore'].astype(float)
+    df['baseScore'] = df['baseScore'].astype(float)
     error_df = df.apply(calculate_errors, axis=1)
-
     # Group by unique image and calculate the mean errors for each image
     grouped_error_df = error_df.groupby('image')[[
         'impactScore_percentage_error', 'exploitabilityScore_percentage_error', 'baseScore_percentage_error',
@@ -25,6 +25,6 @@ def calc_error(file_name):
     ]].mean().reset_index()
 
     # Save the results to table.csv
-    grouped_error_df.to_csv('table.csv', index=False)
+    grouped_error_df.to_csv('results_table.csv', index=False)
 
     print('Results saved to table.csv')

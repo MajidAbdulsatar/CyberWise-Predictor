@@ -20,12 +20,17 @@ def calculate_scores(in_df):
         'integrityImpact': {'NONE': 0.0, 'PARTIAL': 0.275, 'COMPLETE': 0.660},
         'availabilityImpact': {'NONE': 0.0, 'PARTIAL': 0.275, 'COMPLETE': 0.660}
     }
-    predicted_df = in_df
-    calculated_results = predicted_df.apply(lambda row: calculate_individual_scores(row, mapping), axis=1)
-    calculated_df = pd.DataFrame(calculated_results.tolist())
+    groundtruth_df = in_df[in_df['has_cvss_v2'] == 1]
+    predicted_df = in_df[in_df['has_cvss_v2'] == 0]
+    Rcalculated_results = groundtruth_df.apply(lambda row: Rcalculate_individual_scores(row, mapping), axis=1)
+    Rcalculated_df = pd.DataFrame(Rcalculated_results.tolist())
+    
+    Pcalculated_results = predicted_df.apply(lambda row: Pcalculate_individual_scores(row, mapping), axis=1)
+    Pcalculated_df = pd.DataFrame(Pcalculated_results.tolist())
+    calculated_df = pd.concat([Pcalculated_df, Rcalculated_df], ignore_index=True)
     return calculated_df
 
-def calculate_individual_scores(row, mapping):
+def Rcalculate_individual_scores(row, mapping):
     confidentialityImpact = mapping['confidentialityImpact'][row['confidentialityImpact']]
     integrityImpact = mapping['integrityImpact'][row['integrityImpact']]
     availabilityImpact = mapping['availabilityImpact'][row['availabilityImpact']]
@@ -39,8 +44,20 @@ def calculate_individual_scores(row, mapping):
     BaseScore = (0.6 * Impact + 0.4 * Exploitability - 1.5) * f_Impact
 
     return {'cve': row['cve'], 'impactScore': Impact, 'exploitabilityScore': Exploitability, 'baseScore': BaseScore}
+def Pcalculate_individual_scores(row, mapping):
+    confidentialityImpact = mapping['confidentialityImpact'][row['p_confidentialityImpact']]
+    integrityImpact = mapping['integrityImpact'][row['p_integrityImpact']]
+    availabilityImpact = mapping['availabilityImpact'][row['p_availabilityImpact']]
+    accessVector = mapping['accessVector'][row['p_accessVector']]
+    accessComplexity = mapping['accessComplexity'][row['p_accessComplexity']]
+    authentication = mapping['authentication'][row['p_authentication']]
 
+    Impact = 10.41 * (1 - (1 - confidentialityImpact) * (1 - integrityImpact) * (1 - availabilityImpact))
+    Exploitability = 20 * accessVector * accessComplexity * authentication
+    f_Impact = 0 if Impact == 0 else 1.176
+    BaseScore = (0.6 * Impact + 0.4 * Exploitability - 1.5) * f_Impact
 
+    return {'cve': row['cve'], 'impactScore': Impact, 'exploitabilityScore': Exploitability, 'baseScore': BaseScore}
 
 def analyze_and_predict(NAMESPACE):
     mapped_file_path = f"./data/mapped/{NAMESPACE}.csv"
@@ -57,8 +74,8 @@ def analyze_and_predict(NAMESPACE):
     for score_name, scores in calculated_scores.items():
         df[f'p_{score_name}'] = scores
 
-    df.to_csv(f"./data/predicted/pred_{NAMESPACE}", index=False)
+    df.to_csv(f"./data/predicted/pred_{NAMESPACE}.csv", index=False)
     print(f"Analysis, predictions, and calculations completed. Final results saved to '{NAMESPACE}'.")
     from error_table import calc_error
-    calc_error(f"./data/predicted/pred_{NAMESPACE}")
+    calc_error(f"./data/predicted/pred_{NAMESPACE}.csv")
 
